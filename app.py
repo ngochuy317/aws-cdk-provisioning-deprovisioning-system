@@ -4,14 +4,14 @@ from dotenv import load_dotenv
 
 import aws_cdk as cdk
 
-from aws_cdk_provisioning_deprovisioning_system.aws_cdk_provisioning_deprovisioning_system_stack import AwsCdkProvisioningDeprovisioningSystemStack
+from aws_cdk_provisioning_deprovisioning_system.aws_cdk_provisioning_deprovisioning_system import AwsCdkProvisioningDeprovisioningSystem
 
 # Load environment variables from .env file
 load_dotenv()
 app = cdk.App()
-AwsCdkProvisioningDeprovisioningSystemStack(
+AwsCdkProvisioningDeprovisioningSystem(
     app,
-    "AwsCdkProvisioningDeprovisioningSystemStack",
+    "AwsCdkProvisioningDeprovisioningSystem",
     # If you don't specify 'env', this stack will be environment-agnostic.
     # Account/Region-dependent features and context lookups will not work,
     # but a single synthesized template can be deployed anywhere.
