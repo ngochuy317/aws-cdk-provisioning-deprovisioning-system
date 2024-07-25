@@ -80,7 +80,7 @@ To delete the stack and all associated resources, run:
 cdk destroy --profile my-aws-profile
 ```
 
-Project Structure
+### Project Structure
 
 - app.py: The entry point for the CDK application.
 - provisioning_deprovisioning_system/provisioning_deprovisioning_system.py: The main stack definition.
