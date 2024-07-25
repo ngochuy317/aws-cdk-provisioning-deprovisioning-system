@@ -1,58 +1,98 @@
+# Provisioning and Deprovisioning System
 
-# Welcome to your CDK Python project!
+This project sets up and integrates AWS API Gateway, SQS, SNS, Lambda, and SSM Parameter Store using AWS CDK in Python.
 
-This is a blank project for CDK development with Python.
+## Prerequisites
 
-The `cdk.json` file tells the CDK Toolkit how to execute your app.
+Ensure you have the following installed on your machine:
 
-This project is set up like a standard Python project.  The initialization
-process also creates a virtualenv within this project, stored under the `.venv`
-directory.  To create the virtualenv it assumes that there is a `python3`
-(or `python` for Windows) executable in your path with access to the `venv`
-package. If for any reason the automatic creation of the virtualenv fails,
-you can create the virtualenv manually.
+- Python 3.11.9
+- AWS CLI
+- Node.js (for AWS CDK)
+- AWS CDK
 
-To manually create a virtualenv on MacOS and Linux:
+## Setup Instructions
 
-```
-$ python3 -m venv .venv
-```
+### 1. Install Python 3.11.9
 
-After the init process completes and the virtualenv is created, you can use the following
-step to activate your virtualenv.
+Ensure you have Python 3.11.9 installed. You can download it from the [official Python website](https://www.python.org/downloads/).
 
-```
-$ source .venv/bin/activate
-```
+### 2. Set Up a Virtual Environment
 
-If you are a Windows platform, you would activate the virtualenv like this:
+Create and activate a virtual environment to manage your project dependencies.
 
-```
-% .venv\Scripts\activate.bat
+```bash
+python3.11 -m venv .env
+source .env/bin/activate  # On Windows, use `.env\Scripts\activate`
 ```
 
-Once the virtualenv is activated, you can install the required dependencies.
+### 3. Install AWS CDK
 
-```
-$ pip install -r requirements.txt
-```
+Install the AWS CDK globally using npm.
 
-At this point you can now synthesize the CloudFormation template for this code.
-
-```
-$ cdk synth
+```bash
+npm install -g aws-cdk
 ```
 
-To add additional dependencies, for example other CDK libraries, just add
-them to your `setup.py` file and rerun the `pip install -r requirements.txt`
-command.
+### 4. Install Project Dependencies
 
-## Useful commands
+Install the required Python packages using pip.
+```bash
+pip install -r requirements.txt
+```
 
- * `cdk ls`          list all stacks in the app
- * `cdk synth`       emits the synthesized CloudFormation template
- * `cdk deploy`      deploy this stack to your default AWS account/region
- * `cdk diff`        compare deployed stack with current state
- * `cdk docs`        open CDK documentation
+### 5. Configure AWS Profile
 
-Enjoy!
+Configure your AWS CLI with your credentials. This creates a profile that the CDK can use to deploy the stack.
+```bash
+aws configure --profile my-aws-profile
+```
+
+Enter the following details when prompted:
+
+- AWS Access Key ID
+- AWS Secret Access Key
+- Default region name (e.g., us-east-1)
+- Default output format (e.g., json)
+
+
+### 6. Bootstrap Your AWS Environment
+
+Bootstrap your AWS environment if you haven’t done so already. Ensure you use the profile you configured.
+
+```bash
+cdk bootstrap --profile my-aws-profile
+```
+
+### 7. Deploy the Stack
+
+Deploy the stack to your AWS account using the specified profile.
+
+```bash
+cdk deploy --profile my-aws-profile
+```
+
+### 8. Clean Up
+
+To delete the stack and all associated resources, run:
+
+```bash
+cdk destroy --profile my-aws-profile
+```
+
+Project Structure
+
+- app.py: The entry point for the CDK application.
+- provisioning_deprovisioning_system/provisioning_deprovisioning_system.py: The main stack definition.
+- lambda/: Directory containing the Lambda function code.
+- requirements.txt: Python dependencies for the project.
+- .env.example: Example environment file.
+
+### Environment Variables
+Ensure you have a .env file in the root of your project directory. You can use the .env.example file as a template. The .env file should contain:
+```plain text
+SENDER_EMAIL=test@gmail.com
+CDK_DEFAULT_ACCOUNT=123451
+CDK_DEFAULT_REGION=us-east-1
+RECIPIENT_EMAIL=custcommeng@omf.com
+```
