@@ -5,6 +5,8 @@ from aws_cdk import (
     aws_apigateway as apigateway,
     aws_iam as iam,
     aws_lambda as _lambda,
+    aws_sns as sns,
+    aws_sns_subscriptions as sns_subs,
     aws_sqs as sqs,
     aws_lambda_event_sources as lambda_event_sources,
     aws_ssm as ssm,
@@ -16,7 +18,6 @@ from constructs import Construct
 class AwsCdkProvisioningDeprovisioningSystem(Stack):
 
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
-        # self.sender_email = kwargs.pop('sender_email')
         super().__init__(scope, construct_id, **kwargs)
 
         # The code that defines your stack goes here
@@ -29,6 +30,8 @@ class AwsCdkProvisioningDeprovisioningSystem(Stack):
         self.create_api_resources_and_methods()
 
         self.ssm_parameter = self.create_ssm_parameter()
+
+        self.transaction_topic = self.create_topic_sns()
 
         self.hello_world_function = self.create_lambda_function()
 
@@ -157,17 +160,26 @@ class AwsCdkProvisioningDeprovisioningSystem(Stack):
             self,
             "ConfigParameter",
             parameter_name="/config/recipient_email",
-            string_value="ngochuy317@gmail.com"
+            string_value="randomvalue"
         )
 
-    def create_lambda_function(self):
+    def create_topic_sns(self) -> sns.Topic:
+        transaction_topic = sns.Topic(
+            self,
+            id="sns_transaction_topic_id"
+        )
+        transaction_topic.add_subscription(
+            sns_subs.EmailSubscription("ngochuy317@gmail.com")
+        )
+        return transaction_topic
+
+    def create_lambda_function(self) -> _lambda.Function:
         lambda_role = iam.Role(
             self,
             "LambdaExecutionRole",
             assumed_by=iam.ServicePrincipal("lambda.amazonaws.com"),
             managed_policies=[
                 iam.ManagedPolicy.from_aws_managed_policy_name("service-role/AWSLambdaBasicExecutionRole"),
-                iam.ManagedPolicy.from_aws_managed_policy_name("AmazonSESFullAccess")
             ]
         )
         lambda_role.add_to_policy(iam.PolicyStatement(
@@ -186,6 +198,12 @@ class AwsCdkProvisioningDeprovisioningSystem(Stack):
             ],
             resources=["*"]
         ))
+        lambda_role.add_to_policy(iam.PolicyStatement(
+            actions=[
+                "sns:publish"
+            ],
+            resources=[self.transaction_topic.topic_arn]
+        ))
 
         hello_world_function = _lambda.Function(
             self,
@@ -197,7 +215,8 @@ class AwsCdkProvisioningDeprovisioningSystem(Stack):
             handler="hello.lambda_handler",
             environment={
                 "SENDER_EMAIL": os.getenv('SENDER_EMAIL'),
-                "CDK_DEFAULT_REGION": os.getenv('CDK_DEFAULT_REGION')
+                "CDK_DEFAULT_REGION": os.getenv('CDK_DEFAULT_REGION'),
+                "TOPIC_ARN": self.transaction_topic.topic_arn
             },
             role=lambda_role
         )
@@ -219,4 +238,10 @@ class AwsCdkProvisioningDeprovisioningSystem(Stack):
             "LambdaFunctionARN",
             value=self.hello_world_function.function_arn,
             description="ARN of the Lambda function"
+        )
+        CfnOutput(
+            self,
+            "TransactionSNSTopicARN",
+            value=self.transaction_topic.topic_arn,
+            description="ARN of the transaction Topic"
         )
