@@ -21,7 +21,8 @@ class AwsCdkProvisioningDeprovisioningSystem(Stack):
         super().__init__(scope, construct_id, **kwargs)
 
         # The code that defines your stack goes here
-        self.queue = self.create_sqs_queue()
+        self.provisioning_queue = self.create_sqs_queue("ProvisioningSystemQueue")
+        self.deprovisioning_queue = self.create_sqs_queue("DeprovisioningSystemQueue")
 
         self.api_gateway_role = self.create_api_gateway_role()
 
@@ -33,12 +34,30 @@ class AwsCdkProvisioningDeprovisioningSystem(Stack):
 
         self.transaction_topic = self.create_topic_sns()
 
-        self.hello_world_function = self.create_lambda_function()
+        self.lambda_role = self.create_lambda_role()
+
+        self.provisioning_lambda_function = self.create_lambda_function(
+            "ProvisioningLambdaFunction",
+            "provisioning_lambda.lambda_handler",
+            self.lambda_role,
+        )
+        self.provisioning_lambda_function.add_event_source(
+            lambda_event_sources.SqsEventSource(self.provisioning_queue)
+        )
+
+        self.deprovisioning_lambda_function = self.create_lambda_function(
+            "DeprovisioningLambdaFunction",
+            "deprovisioning_lambda.lambda_handler",
+            self.lambda_role,
+        )
+        self.deprovisioning_lambda_function.add_event_source(
+            lambda_event_sources.SqsEventSource(self.deprovisioning_queue)
+        )
 
         self.create_outputs()
 
-    def create_sqs_queue(self) -> sqs.Queue:
-        return sqs.Queue(self, "AwsCdkProvisioningDeprovisioningSystemQueue")
+    def create_sqs_queue(self, queue_name: str) -> sqs.Queue:
+        return sqs.Queue(self, queue_name, content_based_deduplication=True, fifo=True)
 
     def create_api_gateway_role(self) -> iam.Role:
         role = iam.Role(
@@ -48,7 +67,7 @@ class AwsCdkProvisioningDeprovisioningSystem(Stack):
         )
         role.add_to_policy(iam.PolicyStatement(
             actions=["sqs:SendMessage", "sqs:ReceiveMessage"],
-            resources=[self.queue.queue_arn]
+            resources=[self.provisioning_queue.queue_arn, self.deprovisioning_queue.queue_arn]
         ))
         return role
 
@@ -60,32 +79,30 @@ class AwsCdkProvisioningDeprovisioningSystem(Stack):
             description="This service handles provisioning requests.",
         )
 
-    def create_api_resources_and_methods(self):
+    def create_api_resources_and_methods(self) -> None:
 
         contactcenter_resource = self.api_gw.root.add_resource("contactcenter")
-        users_resource = contactcenter_resource.add_resource("users")
         user_resource = contactcenter_resource.add_resource("{user_id}")
 
-        delete_user_integration_request_template = {
+        deprovisioning_integration_request_template = {
             "application/json": (
                 "Action=SendMessage&"
                 "MessageBody=$input.body&"
+                "MessageGroupId=111&"
+                "MessageDeduplicationId=abc&"
                 "MessageAttribute.1.Name=userID&"
                 "MessageAttribute.1.Value.StringValue=$input.params('user_id')&"
-                "MessageAttribute.1.Value.DataType=Number&"
-                "MessageAttribute.2.Name=action&"
-                "MessageAttribute.2.Value.StringValue=deprovision&"
-                "MessageAttribute.2.Value.DataType=String"
+                "MessageAttribute.1.Value.DataType=Number"
             )
         }
 
-        delete_user_integration = apigateway.AwsIntegration(
+        deprovisioning_integration = apigateway.AwsIntegration(
             service="sqs",
             integration_http_method="POST",
-            path=f"{os.getenv('CDK_DEFAULT_ACCOUNT')}/{self.queue.queue_name}",
+            path=f"{os.getenv('CDK_DEFAULT_ACCOUNT')}/{self.deprovisioning_queue.queue_name}",
             options=apigateway.IntegrationOptions(
                 credentials_role=self.api_gateway_role,
-                request_templates=delete_user_integration_request_template,
+                request_templates=deprovisioning_integration_request_template,
                 integration_responses=[
                     apigateway.IntegrationResponse(
                         status_code="200",
@@ -98,23 +115,25 @@ class AwsCdkProvisioningDeprovisioningSystem(Stack):
             )
         )
 
-        create_user_integration_request_template = {
+        provisioning_integration_request_template = {
             "application/json": (
                 "Action=SendMessage&"
                 "MessageBody=$input.body&"
-                "MessageAttribute.1.Name=action&"
-                "MessageAttribute.1.Value.StringValue=provision&"
-                "MessageAttribute.1.Value.DataType=String"
+                "MessageGroupId=234&"
+                "MessageDeduplicationId=abb&"
+                "MessageAttribute.1.Name=userID&"
+                "MessageAttribute.1.Value.StringValue=$input.params('user_id')&"
+                "MessageAttribute.1.Value.DataType=Number"
             )
         }
 
-        create_user_integration = apigateway.AwsIntegration(
+        provisioning_integration = apigateway.AwsIntegration(
             service="sqs",
             integration_http_method="POST",
-            path=f"{os.getenv('CDK_DEFAULT_ACCOUNT')}/{self.queue.queue_name}",
+            path=f"{os.getenv('CDK_DEFAULT_ACCOUNT')}/{self.provisioning_queue.queue_name}",
             options=apigateway.IntegrationOptions(
                 credentials_role=self.api_gateway_role,
-                request_templates=create_user_integration_request_template,
+                request_templates=provisioning_integration_request_template,
                 integration_responses=[
                     apigateway.IntegrationResponse(
                         status_code="200",
@@ -129,7 +148,7 @@ class AwsCdkProvisioningDeprovisioningSystem(Stack):
 
         user_resource.add_method(
             "DELETE",
-            delete_user_integration,
+            deprovisioning_integration,
             authorization_type=apigateway.AuthorizationType.IAM,
             method_responses=[
                 apigateway.MethodResponse(
@@ -141,9 +160,9 @@ class AwsCdkProvisioningDeprovisioningSystem(Stack):
             ]
         )
 
-        users_resource.add_method(
-            "POST",
-            create_user_integration,
+        user_resource.add_method(
+            "PUT",
+            provisioning_integration,
             authorization_type=apigateway.AuthorizationType.IAM,
             method_responses=[
                 apigateway.MethodResponse(
@@ -169,11 +188,11 @@ class AwsCdkProvisioningDeprovisioningSystem(Stack):
             id="sns_transaction_topic_id"
         )
         transaction_topic.add_subscription(
-            sns_subs.EmailSubscription("ngochuy317@gmail.com")
+            sns_subs.EmailSubscription(os.environ['RECIPIENT_EMAIL'])
         )
         return transaction_topic
 
-    def create_lambda_function(self) -> _lambda.Function:
+    def create_lambda_role(self) -> iam.Role:
         lambda_role = iam.Role(
             self,
             "LambdaExecutionRole",
@@ -190,7 +209,7 @@ class AwsCdkProvisioningDeprovisioningSystem(Stack):
                 "sqs:GetQueueUrl",
                 "sqs:ReceiveMessage",
             ],
-            resources=[self.queue.queue_arn]
+            resources=[self.provisioning_queue.queue_arn, self.deprovisioning_queue.queue_arn]
         ))
         lambda_role.add_to_policy(iam.PolicyStatement(
             actions=[
@@ -204,40 +223,76 @@ class AwsCdkProvisioningDeprovisioningSystem(Stack):
             ],
             resources=[self.transaction_topic.topic_arn]
         ))
+        return lambda_role
 
-        hello_world_function = _lambda.Function(
+    def create_lambda_function(self, lambda_function_name: str, handler: str, role: iam.Role) -> _lambda.Function:
+
+        lambda_function = _lambda.Function(
             self,
-            "HelloWorldFunction",
+            lambda_function_name,
             runtime=_lambda.Runtime.PYTHON_3_11,
             # Points to the lambda directory
             code=_lambda.Code.from_asset("lambda"),
             # Points to the 'hello' file in the lambda directory
-            handler="hello.lambda_handler",
+            handler=handler,
             environment={
                 "SENDER_EMAIL": os.getenv('SENDER_EMAIL'),
                 "CDK_DEFAULT_REGION": os.getenv('CDK_DEFAULT_REGION'),
                 "TOPIC_ARN": self.transaction_topic.topic_arn
             },
-            role=lambda_role
+            role=role
         )
 
-        hello_world_function.add_event_source(lambda_event_sources.SqsEventSource(self.queue))
-        return hello_world_function
+        return lambda_function
 
     def create_outputs(self) -> None:
-        CfnOutput(self, "QueueURL", value=self.queue.queue_url, description="URL of the SQS Queue")
-        CfnOutput(self, "QueueARN", value=self.queue.queue_arn, description="ARN of the SQS Queue")
         CfnOutput(
             self,
-            "LambdaFunctionName",
-            value=self.hello_world_function.function_name,
-            description="Name of the Lambda function",
+            "ProvisioningQueueURL",
+            value=self.provisioning_queue.queue_url,
+            description="URL of the SQS Provisioning Queue"
         )
         CfnOutput(
             self,
-            "LambdaFunctionARN",
-            value=self.hello_world_function.function_arn,
-            description="ARN of the Lambda function"
+            "ProvisioningQueueARN",
+            value=self.provisioning_queue.queue_arn,
+            description="ARN of the Provisioning SQS Queue"
+        )
+        CfnOutput(
+            self,
+            "DeprovisioningQueueURL",
+            value=self.deprovisioning_queue.queue_url,
+            description="URL of the SQS Deprovisioning Queue"
+        )
+        CfnOutput(
+            self,
+            "DeprovisioningQueueARN",
+            value=self.deprovisioning_queue.queue_arn,
+            description="ARN of the Deprovisioning SQS Queue"
+        )
+        CfnOutput(
+            self,
+            "ProvisioningLambdaFunctionName",
+            value=self.provisioning_lambda_function.function_name,
+            description="Name of the Provisioning Lambda function",
+        )
+        CfnOutput(
+            self,
+            "ProvisioningLambdaFunctionARN",
+            value=self.provisioning_lambda_function.function_arn,
+            description="ARN of the provisioning Lambda function"
+        )
+        CfnOutput(
+            self,
+            "DeprovisioningLambdaFunctionName",
+            value=self.deprovisioning_lambda_function.function_name,
+            description="Name of the Deprovisioning Lambda function",
+        )
+        CfnOutput(
+            self,
+            "DeprovisioningLambdaFunctionARN",
+            value=self.deprovisioning_lambda_function.function_arn,
+            description="ARN of the Deprovisioning Lambda function"
         )
         CfnOutput(
             self,

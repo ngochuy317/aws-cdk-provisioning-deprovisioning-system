@@ -1,7 +1,6 @@
 import boto3
 import os
 
-ses_client = boto3.client('ses')
 sns_client = boto3.client('sns')
 ssm_client = boto3.client('ssm', region_name=os.environ['CDK_DEFAULT_REGION'])
 
@@ -25,10 +24,5 @@ def lambda_handler(event, context):
 
 
 def process_message(message):
-    action = message.get("messageAttributes", {}).get("action", {}).get("stringValue")
-    if action == 'provision':
-        print("Provisioning resource...")
-        send_sns("Provisioning Notification", "Resource has been provisioned.")
-    elif action == 'deprovision':
-        print("Deprovisioning resource...")
-        send_sns("Deprovisioning Notification", "Resource has been deprovisioned.")
+    print(f"Deprovisioning resource...Message: {message}")
+    send_sns("Deprovisioning Notification", "Resource has been deprovisioned.")
