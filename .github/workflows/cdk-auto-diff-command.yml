@@ -12,8 +12,8 @@ on:
 env:
   environment: dev
   account_id: ${{ vars.DEV_AWS_ACCOUNT_ID }}
-  RECIPIENT_EMAIL: custcommeng@omf.com
-  SENDER_EMAIL: test@gmail.com
+  RECIPIENT_EMAIL: ${{ vars.RECIPIENT_EMAIL }}
+  SENDER_EMAIL: ${{ vars.SENDER_EMAIL }}
   CDK_DEFAULT_REGION: us-east-1
 jobs:
   cdk_diff:
@@ -46,7 +46,8 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
-          role-to-assume: arn:aws:iam::${{env.account_id}}:role/oma-${{env.environment}}-omfmktanalytics-github-actions_iam_role-ue1-all
+          # role-to-assume: arn:aws:iam::${{env.account_id}}:role/oma-${{env.environment}}-omfmktanalytics-github-actions_iam_role-ue1-all
+          role-to-assume: arn:aws:iam::${{env.account_id}}:role/cdk-hnb659fds-cfn-exec-role-${{env.account_id}}-us-east-1
           role-session-name: github-actions-session
           aws-region: us-east-1
       - name: Run CDK Diff
