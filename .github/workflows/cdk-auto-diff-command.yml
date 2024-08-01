@@ -6,9 +6,6 @@ on:
       - 'cdk/**'
       - 'app.py'
       - 'cdk.json'
-  push:
-    branches:
-      - main
 env:
   environment: dev
   account_id: ${{ vars.DEV_AWS_ACCOUNT_ID }}
