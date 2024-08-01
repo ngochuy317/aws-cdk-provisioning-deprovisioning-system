@@ -2,10 +2,12 @@ name: cdk-auto-diff-command
 run-name: "Run ID ${{github.run_id}}: Running auto 'cdk diff' for '${{ github.head_ref }}' branch - dev"
 on:
   pull_request:
-    paths:
-      - 'cdk/**'
-      - 'app.py'
-      - 'cdk.json'
+    # paths:
+    #   - 'cdk/**'
+    #   - 'app.py'
+    #   - 'cdk.json'
+    branches:
+      - main
 env:
   environment: dev
   account_id: ${{ vars.DEV_AWS_ACCOUNT_ID }}
