@@ -9,6 +9,7 @@ on:
       - completed
 env:
   environment: ${{ vars.ENV }}
+  account_id: ${{ vars.DEV_AWS_ACCOUNT_ID }}
 jobs:
   archive_logs:
     runs-on: ubuntu-latest
@@ -21,21 +22,24 @@ jobs:
         if: env.environment == 'dev'    
         uses: aws-actions/configure-aws-credentials@v2
         with:
-          role-to-assume: arn:aws:iam::${{ vars.DEV_AWS_ACCOUNT_ID }}:role/oma-dev-omfmktanalytics-github-actions_iam_role-ue1-all
+          # role-to-assume: arn:aws:iam::${{ vars.DEV_AWS_ACCOUNT_ID }}:role/oma-dev-omfmktanalytics-github-actions_iam_role-ue1-all
+          role-to-assume: arn:aws:iam::${{env.account_id}}:role/ngochuy317-aws-cdk-provisioning-deprovisioning-system
           role-session-name: github-actions-session
           aws-region: us-east-1
       - name: Configure AWS Credentials - stg
         if: env.environment == 'stg'
         uses: aws-actions/configure-aws-credentials@v2
         with:
-          role-to-assume: arn:aws:iam::${{ vars.STG_AWS_ACCOUNT_ID }}:role/oma-stg-omfmktanalytics-github-actions_iam_role-ue1-all
+          # role-to-assume: arn:aws:iam::${{ vars.STG_AWS_ACCOUNT_ID }}:role/oma-stg-omfmktanalytics-github-actions_iam_role-ue1-all
+          role-to-assume: arn:aws:iam::${{env.account_id}}:role/ngochuy317-aws-cdk-provisioning-deprovisioning-system
           role-session-name: github-actions-session
           aws-region: us-east-1
       - name: Configure AWS Credentials - prod
         if: env.environment == 'prod'
         uses: aws-actions/configure-aws-credentials@v2
         with:
-          role-to-assume: arn:aws:iam::${{ vars.PROD_AWS_ACCOUNT_ID }}:role/oma-prod-omfmktanalytics-github-actions_iam_role-ue1-all
+          # role-to-assume: arn:aws:iam::${{ vars.PROD_AWS_ACCOUNT_ID }}:role/oma-prod-omfmktanalytics-github-actions_iam_role-ue1-all
+          role-to-assume: arn:aws:iam::${{env.account_id}}:role/ngochuy317-aws-cdk-provisioning-deprovisioning-system
           role-session-name: github-actions-session
           aws-region: us-east-1
       - name: Download '${{ github.event.workflow.name}}' Workflow Run Logs - ${{env.environment}}
