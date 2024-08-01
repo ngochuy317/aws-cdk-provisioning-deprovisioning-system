@@ -47,7 +47,7 @@ jobs:
         uses: aws-actions/configure-aws-credentials@v2
         with:
           # role-to-assume: arn:aws:iam::${{env.account_id}}:role/oma-${{env.environment}}-omfmktanalytics-github-actions_iam_role-ue1-all
-          role-to-assume: arn:aws:iam::${{env.account_id}}:role/cdk-hnb659fds-cfn-exec-role-${{env.account_id}}-us-east-1
+          role-to-assume: arn:aws:iam::${{env.account_id}}:role/ngochuy317-aws-cdk-provisioning-deprovisioning-system
           role-session-name: github-actions-session
           aws-region: us-east-1
       - name: Run CDK Diff
